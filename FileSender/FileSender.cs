@@ -194,4 +194,3 @@ namespace FileSender
 			fileSender.SendFiles(new[] {file, file}, certificate).SkippedFiles.Should().BeEquivalentTo(file);			
 		}
 	}
-}
