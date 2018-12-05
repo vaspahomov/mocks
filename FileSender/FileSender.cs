@@ -74,7 +74,9 @@ namespace FileSender
 		private readonly X509Certificate certificate = new X509Certificate();
 		private File file;
 		private byte[] signedContent;
-
+		private const string defaultFormat = "4.0";
+		private Document defaultDocument;
+		
 		[SetUp]
 		public void SetUp()
 		{
@@ -89,6 +91,11 @@ namespace FileSender
 			sender = A.Fake<ISender>();
 			recognizer = A.Fake<IRecognizer>();
 			fileSender = new FileSender(cryptographer, sender, recognizer);
+
+			defaultDocument = new Document(file.Name, file.Content, DateTime.Now, "4.0");
+			A.CallTo(() => recognizer.TryRecognize(A<File>.Ignored, out defaultDocument)).Returns(true);
+			A.CallTo(() => cryptographer.Sign(defaultDocument.Content, certificate)).Returns(signedContent);
+			A.CallTo(() => sender.TrySend(signedContent)).Returns(true);
 		}
 
 		[TestCase("4.0")]
@@ -98,62 +105,93 @@ namespace FileSender
 			var document = new Document(file.Name, file.Content, DateTime.Now, format);
 			A.CallTo(() => recognizer.TryRecognize(file, out document))
 				.Returns(true);
-			A.CallTo(() => cryptographer.Sign(document.Content, certificate))
-				.Returns(signedContent);
-			A.CallTo(() => sender.TrySend(signedContent))
-				.Returns(true);
 
 			fileSender.SendFiles(new[] {file}, certificate)
 				.SkippedFiles.Should().BeEmpty();
 		}
 
-		[Test]
-		[Ignore("Not implemented")]
-		public void Skip_WhenBadFormat()
+		[TestCase(null)]
+		[TestCase("")]
+		[TestCase("VasyaLizhnik")]
+		[TestCase("4")]
+		[TestCase("1.0")]
+		public void Skip_WhenBadFormat(string format)
 		{
-			throw new NotImplementedException();
+			var document = new Document(
+				file.Name, 
+				file.Content, 
+				DateTime.Now, 
+				format);
+			
+			A.CallTo(() => recognizer.TryRecognize(A<File>.Ignored, out document)).Returns(true).Once();
+			
+			fileSender.SendFiles(new[] {file}, certificate).SkippedFiles.Should().BeEquivalentTo(file);
 		}
 
 		[Test]
-		[Ignore("Not implemented")]
 		public void Skip_WhenOlderThanAMonth()
 		{
-			throw new NotImplementedException();
+			var document = new Document(
+				file.Name, 
+				file.Content, 
+				DateTime.MinValue, 
+				defaultFormat);
+			
+			A.CallTo(() => recognizer.TryRecognize(A<File>.Ignored, out document)).Returns(true).Once();
+			
+			fileSender.SendFiles(new[] {file}, certificate).SkippedFiles.Should().BeEquivalentTo(file);
 		}
 
 		[Test]
-		[Ignore("Not implemented")]
 		public void Send_WhenYoungerThanAMonth()
 		{
-			throw new NotImplementedException();
+			var document = new Document(
+				file.Name,
+				file.Content, 
+				DateTime.Now - TimeSpan.FromDays(10),
+				defaultFormat);
+			
+			A.CallTo(() => recognizer.TryRecognize(A<File>.Ignored, out document)).Returns(true).Once();
+			
+			fileSender.SendFiles(new[] {file}, certificate).SkippedFiles.Should().BeEmpty();
 		}
 
 		[Test]
-		[Ignore("Not implemented")]
 		public void Skip_WhenSendFails()
 		{
-			throw new NotImplementedException();
+			var document = new Document(
+				file.Name, 
+				file.Content, 
+				DateTime.Now - TimeSpan.FromDays(10), 
+				defaultFormat);
+			
+			A.CallTo(() => recognizer.TryRecognize(A<File>.Ignored, out document)).Returns(true).Once();
+			
+			fileSender.SendFiles(new[] {file}, certificate).SkippedFiles.Should().BeEmpty();
 		}
 
 		[Test]
-		[Ignore("Not implemented")]
 		public void Skip_WhenNotRecognized()
 		{
-			throw new NotImplementedException();
+			A.CallTo(() => recognizer.TryRecognize(A<File>.Ignored, out defaultDocument)).Returns(false).Once();
+			
+			fileSender.SendFiles(new[] {file}, certificate).SkippedFiles.Should().BeEquivalentTo(file);
 		}
 
 		[Test]
-		[Ignore("Not implemented")]
 		public void IndependentlySend_WhenSeveralFilesAndSomeAreInvalid()
 		{
-			throw new NotImplementedException();
+			A.CallTo(() => recognizer.TryRecognize(A<File>.Ignored, out defaultDocument)).Returns(false).Once();
+			
+			fileSender.SendFiles(new[] {file, file}, certificate).SkippedFiles.Should().BeEquivalentTo(file);
 		}
 
 		[Test]
-		[Ignore("Not implemented")]
 		public void IndependentlySend_WhenSeveralFilesAndSomeCouldNotSend()
 		{
-			throw new NotImplementedException();
+			A.CallTo(() => sender.TrySend(A<byte[]>.Ignored)).Returns(false).Once();
+			
+			fileSender.SendFiles(new[] {file, file}, certificate).SkippedFiles.Should().BeEquivalentTo(file);			
 		}
 	}
 }
